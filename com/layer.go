@@ -1,6 +1,8 @@
 package com
 
-import "log"
+import (
+	"log"
+)
 
 var (
 	L layer
@@ -12,11 +14,13 @@ const (
 
 type layer struct {
 	SendC chan *SendInfo
+	GotC  chan *SendInfo
 }
 
 func newLayer(len int) layer {
 	return layer{
 		SendC: make(chan *SendInfo, len),
+		GotC:  make(chan *SendInfo, len),
 	}
 }
 
@@ -52,4 +56,5 @@ func Close() {
 	}
 
 	close(L.SendC)
+	close(L.GotC)
 }

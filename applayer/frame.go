@@ -66,7 +66,7 @@ func sendAnotherError(format string, a ...interface{}) {
 }
 
 func sendSystemActionToLayer(op byte, addr string, cfg *com.Config) {
-	datalayer.L.AppC <- &datalayer.Action{
+	datalayer.L.SendAppC <- &datalayer.Action{
 		AType: datalayer.SystemType,
 		Data: &datalayer.SystemAction{
 			Op:   op,
@@ -77,7 +77,7 @@ func sendSystemActionToLayer(op byte, addr string, cfg *com.Config) {
 }
 
 func sendMessageActionToLayer(m *message) {
-	datalayer.L.AppC <- &datalayer.Action{
+	datalayer.L.SendAppC <- &datalayer.Action{
 		AType: datalayer.MessageType,
 		Data: &datalayer.MessageAction{
 			Addr:    m.Addr,

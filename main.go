@@ -20,12 +20,11 @@ func main() {
 	// 	BaudRate: 115200,
 	// }))
 
-	applayer.Init()
-	defer applayer.Close()
-	datalayer.Init()
-	defer datalayer.Close()
 	com.Init()
 	defer com.Close()
+	datalayer.Init()
+	defer datalayer.Close()
+	applayer.Init()
 
 	// init application layer and start listen to it
 	srv := http.Server{

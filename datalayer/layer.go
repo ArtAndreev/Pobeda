@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"Pobeda/applayer"
 	"Pobeda/com"
 )
 
@@ -19,8 +18,8 @@ var (
 )
 
 type layer struct {
-	AppC     chan *Action
-	PhysC    chan *com.SendInfo
+	SendAppC chan *Action
+	GetAppC  chan *Action
 	QueueLen int
 
 	myAddr    byte
@@ -31,8 +30,8 @@ type layer struct {
 
 func newLayer(len int) layer {
 	return layer{
-		AppC:     make(chan *Action, len),
-		PhysC:    make(chan *com.SendInfo, len),
+		SendAppC: make(chan *Action, len),
+		GetAppC:  make(chan *Action, len),
 		QueueLen: len,
 
 		myAddr:    0,
@@ -42,7 +41,7 @@ func newLayer(len int) layer {
 }
 
 func (l *layer) listenToAppLayer() {
-	for a := range l.AppC {
+	for a := range l.SendAppC {
 		switch a.AType {
 		case SystemType:
 			sa, ok := a.Data.(*SystemAction)
@@ -107,8 +106,8 @@ func (l *layer) listenToAppLayer() {
 				continue
 			}
 			var addr byte
-			var ok bool
 			if ma.Addr != "" { // broadcast
+				var ok bool
 				addr, ok = L.findAddrByPortName(ma.Addr)
 				if !ok {
 					log.Printf("cannot send message to %s", ma.Addr)
@@ -170,7 +169,7 @@ func (l *layer) kickDeadConn(name string) {
 func (l *layer) listenToPhysLayer() {
 	var buf []byte
 	started := false
-	for got := range l.PhysC {
+	for got := range com.L.GotC {
 		log.Printf("got from phys layer: %+v", got)
 		if !started {
 			if isValidFrame(got.Data) {
@@ -280,7 +279,7 @@ func processFrame(f *frame, from string) {
 
 		// 3 computers, so we know all port names
 		port := L.findPortNameByAddr(f.src)
-		applayer.L.GetC <- &Action{
+		L.SendAppC <- &Action{
 			AType: MessageType,
 			Data: &MessageAction{
 				Addr:    port,
@@ -349,7 +348,7 @@ func DisconnectByPortName(p string) {
 }
 
 func sendAnotherErrorToApp(format string, a ...interface{}) {
-	applayer.L.GetC <- &Action{
+	L.SendAppC <- &Action{
 		AType: SystemType,
 		Data: SystemStatus{
 			Status:  ANOTHER,
@@ -359,7 +358,7 @@ func sendAnotherErrorToApp(format string, a ...interface{}) {
 }
 
 func sendSystemStatusToApp(status byte, format string, a ...interface{}) {
-	applayer.L.GetC <- &Action{
+	L.SendAppC <- &Action{
 		AType: SystemType,
 		Data: SystemStatus{
 			Status:  status,
@@ -382,7 +381,7 @@ func Init() {
 }
 
 func Close() {
-	close(L.AppC)
-	close(L.PhysC)
+	close(L.SendAppC)
+	close(L.GetAppC)
 	close(L.delivered)
 }

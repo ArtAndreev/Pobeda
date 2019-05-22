@@ -14,19 +14,11 @@ var (
 	L layer
 )
 
-type layer struct {
-	GetC chan *datalayer.Action
-}
-
-func newLayer(len int) layer {
-	return layer{
-		GetC: make(chan *datalayer.Action, len),
-	}
-}
+type layer struct{}
 
 func (l *layer) listenToDataLinkLayer() {
 	var f *wsSendFrame
-	for a := range l.GetC {
+	for a := range datalayer.L.GetAppC {
 		switch a.AType {
 		case datalayer.MessageType:
 			msg, ok := a.Data.(*datalayer.MessageAction)
@@ -55,10 +47,6 @@ func (l *layer) listenToDataLinkLayer() {
 }
 
 func Init() {
-	L = newLayer(queueLen)
+	L = layer{}
 	go L.listenToDataLinkLayer()
-}
-
-func Close() {
-	close(L.GetC)
 }

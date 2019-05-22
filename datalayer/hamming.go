@@ -6,7 +6,7 @@ func encode(data []byte) []byte {
 	return data
 }
 
-func decode(data []byte) ([]byte, ok) {
+func decode(data []byte) ([]byte, bool) {
 
 	return data, true
 }

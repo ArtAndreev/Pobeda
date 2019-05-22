@@ -7,8 +7,6 @@ import (
 	"regexp"
 
 	"github.com/tarm/serial"
-
-	"Pobeda/datalayer"
 )
 
 const (
@@ -112,7 +110,8 @@ func listenPort(s *Port) {
 		// send chunks to the data link layer
 		res := make([]byte, len(buf))
 		copy(res, buf)
-		datalayer.L.PhysC <- &SendInfo{
+		log.Printf("sending chunk to data link layer: %x", res)
+		L.GotC <- &SendInfo{
 			Name: s.cfg.Name,
 			Data: res,
 		}
