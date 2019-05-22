@@ -19,6 +19,7 @@ type layer struct{}
 func (l *layer) listenToDataLinkLayer() {
 	var f *wsSendFrame
 	for a := range datalayer.L.GetAppC {
+		log.Printf("sending frame %+v", a)
 		status, ok := a.Data.(*datalayer.ActionPayload)
 		if !ok {
 			log.Printf("cannot cast %T to *datalayer.ActionPayload", a.Data)

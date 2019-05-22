@@ -14,8 +14,8 @@ type wsFrame struct {
 }
 
 type wsSendFrame struct {
-	Type    byte
-	Payload interface{}
+	Type    byte        `json:"type"`
+	Payload interface{} `json:"payload"`
 }
 
 func processWSFrame(f *wsFrame) {

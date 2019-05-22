@@ -28,9 +28,9 @@ func main() {
 
 	// init application layer and start listen to it
 	srv := http.Server{
-		Addr: ":8080",
+		Addr: ":8000",
 	}
-	http.HandleFunc("/chat", applayer.Connect)
+	http.HandleFunc("/ws", applayer.Connect)
 
 	idleConnsClosed := make(chan struct{})
 	go func() {

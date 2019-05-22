@@ -52,12 +52,16 @@ func Connect(cfg *Config) error {
 		return errors.New("cannot parse port num")
 	}
 	num := ms[0]
+	if cfg.StopBits == 0 {
+		cfg.StopBits = 1 // use default
+	}
 	c := serial.OpenOptions{
-		PortName:   path.Join(devPath, comName+num),
-		BaudRate:   cfg.BaudRate,
-		DataBits:   cfg.Size,
-		ParityMode: parity,
-		StopBits:   cfg.StopBits,
+		PortName:        path.Join(devPath, comName+num),
+		BaudRate:        cfg.BaudRate,
+		DataBits:        cfg.Size,
+		ParityMode:      parity,
+		StopBits:        cfg.StopBits,
+		MinimumReadSize: 4,
 	}
 	s, err := serial.Open(c)
 	if err != nil {
@@ -100,8 +104,15 @@ func listenPort(s *Port) {
 		_, err := s.p.Read(buf)
 		if err != nil {
 			// todo: error
+			if err == io.EOF {
+				// ignore, nothing important
+				continue
+			}
 			log.Printf("com: listen port %s err: %s", s.cfg.Name, err)
 			continue // or inform data link layer (port is dead)
+		}
+		if len(buf) == 0 {
+			continue
 		}
 		log.Printf("got chunk: %x", buf)
 

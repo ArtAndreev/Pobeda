@@ -11,7 +11,7 @@ import (
 
 var (
 	// for handling multiple browser sessions
-	clients map[string]Client
+	clients = make(map[string]Client, 2)
 )
 
 func Connect(w http.ResponseWriter, r *http.Request) {
@@ -32,8 +32,9 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 
 func handle(conn *websocket.Conn) {
 	c := Client{
-		uuid: uuid.NewV4().String(),
-		conn: conn,
+		uuid:  uuid.NewV4().String(),
+		conn:  conn,
+		sendC: make(chan []byte, queueLen),
 	}
 	go c.Listen()
 	go c.Send()
@@ -46,6 +47,7 @@ func send(m *wsSendFrame) {
 		log.Printf("cannot json marshal %T", m)
 		return
 	}
+	log.Printf("clients: %+v", clients)
 	for _, v := range clients {
 		v.sendC <- j
 	}

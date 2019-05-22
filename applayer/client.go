@@ -39,6 +39,7 @@ func (c *Client) Listen() {
 
 func (c *Client) Send() {
 	for m := range c.sendC {
+		log.Printf("finally sending %s", string(m))
 		err := c.conn.WriteMessage(websocket.TextMessage, m)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err) {

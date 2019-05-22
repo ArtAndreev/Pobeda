@@ -61,6 +61,7 @@ func (l *layer) listenToAppLayer() {
 				continue
 			}
 			L.conns[sa.Cfg.Name] = 0 // no addr => no logical connection
+			log.Printf("connected to %s", sa.Cfg.Name)
 			SendActionStatusToApp(CONNECT, sa.Cfg.Name, "", "")
 		case OP_DISCONNECT:
 			// disconnect gracefully killing the ring
@@ -362,7 +363,7 @@ func SendActionStatusToApp(op byte, addr, messageTo, messageFormat string, a ...
 		AType: op,
 		Data: &ActionPayload{
 			Addr:    addr,
-			Message: fmt.Sprintf(messageFormat, a),
+			Message: fmt.Sprintf(messageFormat, a...),
 			To:      messageTo,
 		},
 	}
