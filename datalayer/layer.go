@@ -42,68 +42,61 @@ func newLayer(len int) layer {
 
 func (l *layer) listenToAppLayer() {
 	for a := range l.SendAppC {
+		sa, ok := a.Data.(*SystemAction)
+		if !ok {
+			log.Printf("cannot cast to *SystemAction '%T'", sa)
+			continue
+		}
+
 		switch a.AType {
-		case SystemType:
-			sa, ok := a.Data.(*SystemAction)
-			if !ok {
-				log.Printf("cannot cast to *SystemAction '%T'", sa)
+		case OP_CONNECT:
+			if sa.Cfg == nil {
+				log.Printf("cannot connect: no cfg available")
+				SendActionStatusToApp(ERROR, "", "", ErrProtocolBug)
 				continue
 			}
-
-			switch sa.Op {
-			case OP_CONNECT:
-				if sa.Cfg == nil {
-					log.Printf("cannot connect: no cfg available")
-					sendAnotherErrorToApp("cannot connect: no cfg available")
-					continue
-				}
-				if err := com.Connect(sa.Cfg); err != nil {
-					log.Printf("cannot connect to %s: %s", sa.Cfg.Name, err)
-					sendAnotherErrorToApp("cannot connect to %s: %s", sa.Cfg.Name, err)
-					continue
-				}
-				L.conns[sa.Cfg.Name] = 0 // no addr => no logical connection
-				sendSystemStatusToApp(CONNECT, sa.Addr)
-			case OP_DISCONNECT:
-				// disconnect gracefully killing the ring
-				killRing()
-
-				if err := com.ClosePort(sa.Addr); err != nil {
-					log.Printf("cannot disconnect from %s: %s", sa.Addr, err)
-					sendAnotherErrorToApp("cannot disconnect from %s: %s", sa.Addr, err)
-					continue
-				}
-				log.Printf("successful disconnect from %s", sa.Addr)
-				sendSystemStatusToApp(DISCONNECT, sa.Addr)
-				DisconnectByPortName(sa.Addr)
-			case OP_RING_CONNECT:
-				port := L.getRandomPortName()
-				if port == "" {
-					sendAnotherErrorToApp("cannot ring connect: no port available")
-					continue
-				}
-				if L.myAddr == 0 { // better think about it
-					firstAddr := minAddr // init our addr only after successful receiving this frame back
-					f, err := newFrame(0, firstAddr, linkFrame, nil)
-					if err != nil {
-						log.Printf("cannot ring connect: %s", err)
-						sendAnotherErrorToApp("cannot ring connect: %s", err)
-						continue
-					}
-					sendToPort(port, f.Marshal())
-					L.conns[port] = firstAddr + 1 // next will have incremented addr // fixme
-				} else {
-					log.Printf("cannot ring connect: already connected")
-					sendAnotherErrorToApp("cannot ring connect: already connected")
-				}
-			case OP_KILL_RING:
-				killRing()
-			default:
-				log.Printf("system action: unknown op type %d", a.AType)
-				sendAnotherErrorToApp("system action: unknown op type %d", a.AType)
+			if err := com.Connect(sa.Cfg); err != nil {
+				log.Printf("cannot connect to %s: %s", sa.Cfg.Name, err)
+				SendActionStatusToApp(ERROR, sa.Cfg.Name, "", ErrPhysConnect)
+				continue
 			}
+			L.conns[sa.Cfg.Name] = 0 // no addr => no logical connection
+			SendActionStatusToApp(CONNECT, sa.Cfg.Name, "", "")
+		case OP_DISCONNECT:
+			// disconnect gracefully killing the ring
+			killRing()
 
-		case MessageType:
+			if err := com.ClosePort(sa.Addr); err != nil {
+				log.Printf("cannot disconnect from %s: %s", sa.Addr, err)
+				// SendActionStatusToApp(ERROR,"cannot disconnect from %s: %s", sa.Addr, err)
+				continue
+			}
+			log.Printf("successful disconnect from %s", sa.Addr)
+			SendActionStatusToApp(DISCONNECT, sa.Addr, "", "")
+			DisconnectByPortName(sa.Addr)
+		case OP_RING_CONNECT:
+			port := L.getRandomPortName()
+			if port == "" {
+				SendActionStatusToApp(ERROR, "", "", ErrRingConnect)
+				continue
+			}
+			if L.myAddr == 0 { // better think about it
+				firstAddr := minAddr // init our addr only after successful receiving this frame back
+				f, err := newFrame(0, firstAddr, linkFrame, nil)
+				if err != nil {
+					log.Printf("cannot ring connect: %s", err)
+					SendActionStatusToApp(ERROR, "", "", ErrRingConnect)
+					continue
+				}
+				sendToPort(port, f.Marshal())
+				L.conns[port] = firstAddr + 1 // next will have incremented addr // fixme
+			} else {
+				log.Printf("cannot ring connect: already connected")
+				SendActionStatusToApp(ERROR, "", "", ErrRingConnect)
+			}
+		case OP_KILL_RING:
+			killRing()
+		case OP_SEND:
 			ma, ok := a.Data.(*MessageAction)
 			if !ok {
 				log.Printf("cannot cast to *MessageAction '%T'", ma)
@@ -115,8 +108,8 @@ func (l *layer) listenToAppLayer() {
 				addr, ok = L.findAddrByPortName(ma.Addr)
 				if !ok {
 					log.Printf("cannot send message to %s", ma.Addr)
-					sendSystemStatusToApp(NO_ACK, "disconnected")
-					sendSystemStatusToApp(DISCONNECT, ma.Addr)
+					// sendSystemStatusToApp(NO_ACK, "disconnected")
+					// sendSystemStatusToApp(DISCONNECT, ma.Addr)
 					L.kickDeadConn(ma.Addr)
 					killRing()
 					continue
@@ -127,7 +120,7 @@ func (l *layer) listenToAppLayer() {
 			f, err := newFrame(L.myAddr, addr, iFrame, ma.Message)
 			if err != nil {
 				log.Printf("cannot put message to frame: %s", err)
-				sendAnotherErrorToApp("cannot put message to frame: %s", err)
+				// sendAnotherErrorToApp("cannot put message to frame: %s", err)
 				continue
 			}
 			sendToPort(ma.Addr, f.Marshal())
@@ -139,7 +132,7 @@ func (l *layer) listenToAppLayer() {
 
 		default:
 			log.Printf("unknown action type %d", a.AType)
-			sendAnotherErrorToApp("unknown action type %d", a.AType)
+			SendActionStatusToApp(ERROR, "", "", ErrProtocolBug)
 		}
 	}
 }
@@ -147,22 +140,25 @@ func (l *layer) listenToAppLayer() {
 func killRing() {
 	port := L.getRandomPortName()
 	if port == "" {
-		sendAnotherErrorToApp("cannot ring disconnect: no port available")
+		log.Printf("cannot ring disconnect: no port available")
+		// SendActionStatusToApp("cannot ring disconnect: no port available")
 		return
 	}
 	if L.myAddr != 0 {
 		f, err := newFrame(0, L.myAddr, linkFrame, nil)
 		if err != nil {
-			sendAnotherErrorToApp("cannot ring disconnect: %s", err)
+			log.Printf("cannot ring disconnect: %s", err)
+			// sendAnotherErrorToApp("cannot ring disconnect: %s", err)
 			return
 		}
 		L.myAddr = 0
 		sendToPort(port, f.Marshal())
 	} else {
-		sendAnotherErrorToApp("cannot ring disconnect: already disconnected")
+		log.Printf("cannot ring disconnect: already disconnected")
+		// SendActionStatusToApp(ERROR, "")
 	}
 
-	sendSystemStatusToApp(DISRUPTION, "OK")
+	SendActionStatusToApp(DISRUPTION, "", "", "")
 }
 
 func (l *layer) kickDeadConn(name string) {
@@ -199,14 +195,14 @@ func (l *layer) listenToPhysLayer() {
 			log.Printf("processing %x...", res)
 			var f frame
 			var ok bool
-			res, ok = decode(res)
+			// res, ok = decode(res)
 			if !ok {
 				// broken, need to get this frame again
 				addr, ok := L.findAddrByPortName(got.Name)
 				if !ok {
 					// connection is dead
 					log.Printf("connection %s is dead", got.Name)
-					sendSystemStatusToApp(DISCONNECT, got.Name)
+					SendActionStatusToApp(DISCONNECT, got.Name, "", "")
 					L.kickDeadConn(got.Name)
 					killRing()
 					continue
@@ -273,7 +269,7 @@ func processFrame(f *frame, from string) {
 			port := L.getAnotherPort(from)
 			if port == "" {
 				log.Printf("disconnect, cannot find another port")
-				sendSystemStatusToApp(DISCONNECT, L.lastDead)
+				SendActionStatusToApp(DISCONNECT, L.lastDead, "", "")
 				killRing()
 				return
 			}
@@ -284,7 +280,7 @@ func processFrame(f *frame, from string) {
 		// 3 computers, so we know all port names
 		port := L.findPortNameByAddr(f.src)
 		L.SendAppC <- &Action{
-			AType: MessageType,
+			AType: MESSAGE,
 			Data: &MessageAction{
 				Addr:    port,
 				Message: f.data,
@@ -294,7 +290,7 @@ func processFrame(f *frame, from string) {
 			port := L.getAnotherPort(from)
 			if port == "" {
 				log.Printf("disconnect, cannot find another port")
-				sendSystemStatusToApp(DISCONNECT, L.lastDead)
+				SendActionStatusToApp(DISCONNECT, L.lastDead, "", "")
 				killRing()
 				return
 			}
@@ -306,7 +302,7 @@ func processFrame(f *frame, from string) {
 			port := L.getAnotherPort(from)
 			if port == "" {
 				log.Printf("disconnect, cannot find another port")
-				sendSystemStatusToApp(DISCONNECT, L.lastDead)
+				SendActionStatusToApp(DISCONNECT, L.lastDead, "", "")
 				return
 			} else {
 				newF, err := newFrame(0, f.src+1, linkFrame, nil)
@@ -321,27 +317,34 @@ func processFrame(f *frame, from string) {
 			// we got frame back, logical conn is ok
 			L.myAddr = minAddr
 		}
-		sendSystemStatusToApp(CONNECT_RING, "OK")
+		log.Printf("CONNECT_RING: 'OK'")
+		SendActionStatusToApp(CONNECT_RING, "OK", "", "")
 	case uplinkFrame:
 		if f.src != L.myAddr {
 			port := L.getAnotherPort(from)
 			if port == "" {
 				log.Printf("disconnect, cannot find another port")
-				sendSystemStatusToApp(DISCONNECT, L.lastDead)
+				SendActionStatusToApp(DISCONNECT, L.lastDead, "", "")
 			} else {
 				sendToPort(port, f.Marshal())
 			}
 		}
 		L.myAddr = 0
-		sendSystemStatusToApp(DISRUPTION, "by frame")
+		SendActionStatusToApp(DISRUPTION, "", "", "")
 	case ackFrame:
 		// successful delivery
 		L.delivered <- struct{}{}
 		log.Printf("ACK, last frame %+x", lastFrame)
-		sendSystemStatusToApp(ACK, "OK")
+		// from: f.src, to: f.dest
+		var to string
+		if f.dest != 0 {
+			to = L.findPortNameByAddr(f.dest)
+		}
+		SendActionStatusToApp(ACK, from, to, "")
 		lastFrame = nil
 	case retFrame:
 		// resend last frame
+		log.Printf("RET, last frame %+x", lastFrame)
 		sendToPort(from, lastFrame)
 	default:
 		// unknown frame
@@ -351,25 +354,27 @@ func processFrame(f *frame, from string) {
 func DisconnectByPortName(p string) {
 	L.kickDeadConn(p)
 	killRing()
-	sendSystemStatusToApp(DISRUPTION, "by com-port")
+	SendActionStatusToApp(DISRUPTION, "", "", "")
 }
 
-func sendAnotherErrorToApp(format string, a ...interface{}) {
-	L.SendAppC <- &Action{
-		AType: SystemType,
-		Data: SystemStatus{
-			Status:  ANOTHER,
-			Message: fmt.Sprintf(format, a),
+func SendActionStatusToApp(op byte, addr, messageTo, messageFormat string, a ...interface{}) {
+	L.GetAppC <- &Action{
+		AType: op,
+		Data: &ActionPayload{
+			Addr:    addr,
+			Message: fmt.Sprintf(messageFormat, a),
+			To:      messageTo,
 		},
 	}
 }
 
-func sendSystemStatusToApp(status byte, format string, a ...interface{}) {
+func GetActionStatusFromApp(op byte, addr string, cfg *com.Config, message string) {
 	L.SendAppC <- &Action{
-		AType: SystemType,
-		Data: SystemStatus{
-			Status:  status,
-			Message: fmt.Sprintf(format, a),
+		AType: op,
+		Data: &SystemAction{
+			Addr:    addr,
+			Cfg:     cfg,
+			Message: message,
 		},
 	}
 }

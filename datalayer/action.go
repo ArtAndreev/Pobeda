@@ -4,11 +4,6 @@ import (
 	"Pobeda/com"
 )
 
-const (
-	SystemType = iota
-	MessageType
-)
-
 type Action struct {
 	AType byte
 	Data  interface{}
@@ -23,8 +18,17 @@ const (
 	CONNECT_REQUEST           //
 	DISCONNECT_REQUEST        //
 	ACK                       // send message ok
-	ANOTHER                   // errors, protocol bugs
+	ERROR                     // errors, protocol bugs
 	CONNECT_RING              // connected ring
+
+	MESSAGE // message to frontend
+)
+
+// for ERROR
+const (
+	ErrProtocolBug = "ErrProtocolBug"
+	ErrPhysConnect = "ErrPhysConnect"
+	ErrRingConnect = "ErrRingConnect"
 )
 
 // system operations to perform from app layer to data layer
@@ -33,7 +37,7 @@ const (
 	OP_DISCONNECT          // physical
 	OP_RING_CONNECT        // logical
 	OP_KILL_RING           // logical
-	OP_SEND                // matches to MessageType
+	OP_SEND                // message
 )
 
 type MessageAction struct {
@@ -41,14 +45,14 @@ type MessageAction struct {
 	Message []byte
 }
 
-type SystemAction struct {
-	Op byte `json:"op"` // required
-
-	Addr string      `json:"addr"` // disconnect
-	Cfg  *com.Config `json:"cfg"`  // connect
+type SystemAction struct { // from frontend
+	Addr    string      `json:"addr"` // disconnect
+	Cfg     *com.Config `json:"cfg"`  // connect
+	Message string      `json:"message"`
 }
 
-type SystemStatus struct {
-	Status  byte
-	Message string
+type ActionPayload struct {
+	Addr    string `json:"addr"`
+	Message string `json:"message"`
+	To      string `json:"to"`
 }
