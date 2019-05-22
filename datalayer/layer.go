@@ -62,8 +62,12 @@ func (l *layer) listenToAppLayer() {
 					sendAnotherErrorToApp("cannot connect to %s: %s", sa.Cfg.Name, err)
 					continue
 				}
+				L.conns[sa.Cfg.Name] = 0 // no addr => no logical connection
 				sendSystemStatusToApp(CONNECT, sa.Addr)
 			case OP_DISCONNECT:
+				// disconnect gracefully killing the ring
+				killRing()
+
 				if err := com.ClosePort(sa.Addr); err != nil {
 					log.Printf("cannot disconnect from %s: %s", sa.Addr, err)
 					sendAnotherErrorToApp("cannot disconnect from %s: %s", sa.Addr, err)
@@ -71,8 +75,7 @@ func (l *layer) listenToAppLayer() {
 				}
 				log.Printf("successful disconnect from %s", sa.Addr)
 				sendSystemStatusToApp(DISCONNECT, sa.Addr)
-				// disconnect gracefully killing the ring
-				killRing()
+				DisconnectByPortName(sa.Addr)
 			case OP_RING_CONNECT:
 				port := L.getRandomPortName()
 				if port == "" {
@@ -80,14 +83,15 @@ func (l *layer) listenToAppLayer() {
 					continue
 				}
 				if L.myAddr == 0 { // better think about it
-					L.myAddr = 1
-					f, err := newFrame(0, L.myAddr, linkFrame, nil)
+					firstAddr := minAddr // init our addr only after successful receiving this frame back
+					f, err := newFrame(0, firstAddr, linkFrame, nil)
 					if err != nil {
 						log.Printf("cannot ring connect: %s", err)
 						sendAnotherErrorToApp("cannot ring connect: %s", err)
 						continue
 					}
 					sendToPort(port, f.Marshal())
+					L.conns[port] = firstAddr + 1 // next will have incremented addr // fixme
 				} else {
 					log.Printf("cannot ring connect: already connected")
 					sendAnotherErrorToApp("cannot ring connect: already connected")
@@ -313,6 +317,9 @@ func processFrame(f *frame, from string) {
 				L.myAddr = f.src + 1
 				sendToPort(port, newF.Marshal())
 			}
+		} else {
+			// we got frame back, logical conn is ok
+			L.myAddr = minAddr
 		}
 		sendSystemStatusToApp(CONNECT_RING, "OK")
 	case uplinkFrame:

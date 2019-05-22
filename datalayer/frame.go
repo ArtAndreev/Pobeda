@@ -10,11 +10,11 @@ const (
 	startByte byte = 0xFF
 	stopByte  byte = 0xFF
 
-	maxDataLen  = 1<<8 - 1 // 255 bytes, because len field is byte
-	minFrameLen = 5        // 5 bytes
-	minAddr     = 0x01
-	maxAddr     = 0x7E
-	broadcast   = 0x7F
+	maxDataLen       = 1<<8 - 1 // 255 bytes, because len field is byte
+	minFrameLen      = 5        // 5 bytes
+	minAddr     byte = 0x01
+	maxAddr     byte = 0x7E
+	broadcast   byte = 0x7F
 )
 
 var (

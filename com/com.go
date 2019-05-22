@@ -2,11 +2,12 @@ package com
 
 import (
 	"errors"
+	"io"
 	"log"
 	"path"
 	"regexp"
 
-	"github.com/tarm/serial"
+	"github.com/jacobsa/go-serial/serial"
 )
 
 const (
@@ -24,46 +25,43 @@ var (
 )
 
 type Port struct {
-	p   *serial.Port
+	p   io.ReadWriteCloser
 	cfg *Config
 }
 
 type Config struct {
 	Name     string `json:"name"`
-	BaudRate int    `json:"baudRate"`
-	Size     byte   `json:"size"`
+	BaudRate uint   `json:"baudRate"`
+	Size     uint   `json:"size"`
 	Parity   string `json:"parity"`
-	StopBits byte   `json:"stopBits"`
+	StopBits uint   `json:"stopBits"`
 }
 
 func Connect(cfg *Config) error {
-	var parity serial.Parity
+	var parity serial.ParityMode
 	switch cfg.Parity {
 	case "odd":
-		parity = serial.ParityOdd
+		parity = serial.PARITY_ODD
 	case "even":
-		parity = serial.ParityEven
-	case "mark":
-		parity = serial.ParityMark
-	case "space":
-		parity = serial.ParitySpace
+		parity = serial.PARITY_EVEN
 	default:
-		parity = serial.ParityNone
+		parity = serial.PARITY_NONE
 	}
 	ms := portNum.FindStringSubmatch(cfg.Name)
 	if len(ms) == 0 {
 		return errors.New("cannot parse port num")
 	}
 	num := ms[0]
-	c := &serial.Config{
-		Name:     path.Join(devPath, comName+num),
-		Baud:     cfg.BaudRate,
-		Size:     cfg.Size,
-		Parity:   parity,
-		StopBits: serial.StopBits(cfg.StopBits),
+	c := serial.OpenOptions{
+		PortName:   path.Join(devPath, comName+num),
+		BaudRate:   cfg.BaudRate,
+		DataBits:   cfg.Size,
+		ParityMode: parity,
+		StopBits:   cfg.StopBits,
 	}
-	s, err := serial.OpenPort(c)
+	s, err := serial.Open(c)
 	if err != nil {
+		log.Printf("physical layer: error opening port '%s' with cfg %+v: %s", cfg.Name, cfg, err)
 		return err
 	}
 
