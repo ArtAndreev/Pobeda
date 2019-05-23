@@ -13,6 +13,10 @@ import (
 	"Pobeda/datalayer"
 )
 
+const (
+	srvPort = ":8000"
+)
+
 func main() {
 	// test com connection
 	// log.Println(com.Connect(&com.Config{
@@ -28,7 +32,7 @@ func main() {
 
 	// init application layer and start listen to it
 	srv := http.Server{
-		Addr: ":8000",
+		Addr: srvPort,
 	}
 	http.HandleFunc("/ws", applayer.Connect)
 
@@ -45,7 +49,7 @@ func main() {
 		close(idleConnsClosed)
 	}()
 
-	log.Println("Starting HTTP server on :8080...")
+	log.Printf("Starting HTTP server on %s...", srvPort)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Printf("HTTP server ListenAndServe: %s", err)
 	}

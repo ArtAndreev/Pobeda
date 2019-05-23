@@ -1,9 +1,10 @@
 package datalayer
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"strings"
+	"log"
 )
 
 const (
@@ -26,6 +27,7 @@ var (
 const (
 	iFrame      = iota // data frame
 	linkFrame          // init ring
+	linkOKFrame        // broadcast it after successful init of ring
 	uplinkFrame        // kill ring
 	ackFrame           // got frame is ok, send ok
 	retFrame           // got frame is not ok, ask for this frame again
@@ -83,13 +85,22 @@ func (f *frame) Unmarshal(v []byte) error {
 	}
 	f.stop = v[5+f.len]
 
+	if int(5+f.len+1) != len(v) {
+		log.Printf("incorrect read of frame")
+		return ErrWrongFrame
+	}
+
 	return nil
 }
 
-func isValidFrame(d []byte) bool {
-	return d[0] == startByte
+func isValidFrame(f []byte) bool {
+	return f[0] == startByte && f[len(f)-1] == stopByte
+}
+
+func hasStartByte(f []byte) bool {
+	return f[0] == startByte
 }
 
 func findEndOfFrame(d []byte) int {
-	return strings.Index(string(d), string(stopByte))
+	return bytes.Index(d, []byte{stopByte})
 }

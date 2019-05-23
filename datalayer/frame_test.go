@@ -23,6 +23,19 @@ func TestFrame_Marshal(t *testing.T) {
 			},
 			expected: []byte{startByte, 0, 1, iFrame, 6, 'a', 'b', 'c', 'd', 'e', 'f', stopByte},
 		},
+		{
+			data: frame{
+				start: startByte,
+				dest:  0,
+				src:   1,
+				fType: iFrame,
+				len:   16,
+				data:  []byte(`{"nick":"asdf"}`),
+				stop:  stopByte,
+			},
+			expected: []byte{startByte, 0, 1, iFrame, 16,
+				'{', '"', 'n', 'i', 'c', 'k', '"', ':', '"', 'a', 's', 'd', 'f', '"', '}', stopByte},
+		},
 	}
 
 	for i, c := range cases {

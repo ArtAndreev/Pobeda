@@ -40,11 +40,6 @@ const (
 	OP_SEND                // message
 )
 
-type MessageAction struct {
-	Addr    string
-	Message []byte
-}
-
 type SystemAction struct { // from frontend
 	Addr    string      `json:"addr"` // disconnect
 	Cfg     *com.Config `json:"cfg"`  // connect
@@ -52,7 +47,7 @@ type SystemAction struct { // from frontend
 }
 
 type ActionPayload struct {
-	Addr    string `json:"addr"`
-	Message string `json:"message"`
-	To      string `json:"to"`
+	Addr    string `json:"addr,omitempty"`
+	Message string `json:"message,omitempty"`
+	To      string `json:"to,omitempty"`
 }

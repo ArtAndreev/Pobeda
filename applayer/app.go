@@ -47,7 +47,6 @@ func send(m *wsSendFrame) {
 		log.Printf("cannot json marshal %T", m)
 		return
 	}
-	log.Printf("clients: %+v", clients)
 	for _, v := range clients {
 		v.sendC <- j
 	}

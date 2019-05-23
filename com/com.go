@@ -56,12 +56,13 @@ func Connect(cfg *Config) error {
 		cfg.StopBits = 1 // use default
 	}
 	c := serial.OpenOptions{
-		PortName:        path.Join(devPath, comName+num),
-		BaudRate:        cfg.BaudRate,
-		DataBits:        cfg.Size,
-		ParityMode:      parity,
-		StopBits:        cfg.StopBits,
-		MinimumReadSize: 4,
+		PortName:              path.Join(devPath, comName+num),
+		BaudRate:              cfg.BaudRate,
+		DataBits:              cfg.Size,
+		ParityMode:            parity,
+		StopBits:              cfg.StopBits,
+		MinimumReadSize:       0,
+		InterCharacterTimeout: 1000,
 	}
 	s, err := serial.Open(c)
 	if err != nil {
@@ -99,9 +100,9 @@ func write(addr string, b []byte) error {
 }
 
 func listenPort(s *Port) {
-	var buf []byte
+	buf := make([]byte, 128)
 	for {
-		_, err := s.p.Read(buf)
+		n, err := s.p.Read(buf)
 		if err != nil {
 			// todo: error
 			if err == io.EOF {
@@ -112,12 +113,13 @@ func listenPort(s *Port) {
 			continue // or inform data link layer (port is dead)
 		}
 		if len(buf) == 0 {
+			// log.Printf("alive")
 			continue
 		}
-		log.Printf("got chunk: %x", buf)
+		log.Printf("got chunk: %x", buf[:n])
 
 		// send chunks to the data link layer
-		res := make([]byte, len(buf))
+		res := make([]byte, n)
 		copy(res, buf)
 		log.Printf("sending chunk to data link layer: %x", res)
 		L.GotC <- &SendInfo{

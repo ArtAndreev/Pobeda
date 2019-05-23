@@ -39,13 +39,13 @@ func processWSFrame(f *wsFrame) {
 		}
 		datalayer.GetActionStatusFromApp(datalayer.OP_SEND, m.Addr, nil, m.Message)
 	case datalayer.OP_DISCONNECT:
-		var port string
-		if err := json.Unmarshal(f.Payload, &port); err != nil {
+		var a datalayer.SystemAction
+		if err := json.Unmarshal(f.Payload, &a); err != nil {
 			log.Printf("OP_DISCONNECT: cannot cast payload %+v to string: %s", f.Payload, err)
 			datalayer.SendActionStatusToApp(datalayer.ERROR, "", "", datalayer.ErrProtocolBug)
 			return
 		}
-		datalayer.GetActionStatusFromApp(datalayer.OP_DISCONNECT, port, nil, "")
+		datalayer.GetActionStatusFromApp(datalayer.OP_DISCONNECT, a.Addr, nil, "")
 	case datalayer.OP_KILL_RING:
 		datalayer.GetActionStatusFromApp(datalayer.OP_KILL_RING, "", nil, "")
 	default:
